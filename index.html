@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>매크로 인증 관리</title>
+    <style>
+        body { 
+            font-family: '맑은 고딕', sans-serif; 
+            background-color: #f4f6f9; 
+            margin: 30px auto; 
+            max-width: 1150px; 
+            padding: 0 20px; 
+        }
+        h2 { 
+            color: #2c3e50; 
+            margin-bottom: 15px; 
+            text-align: center; 
+        }
+        .control-box { 
+            background: white; 
+            padding: 15px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
+            margin-bottom: 20px; 
+            display: flex; 
+            gap: 10px; 
+            align-items: center; 
+            justify-content: center; 
+            flex-wrap: wrap; 
+        }
+        input, select, button { 
+            padding: 8px 12px; 
+            font-size: 13px; 
+            border: 1px solid #ccc; 
+            border-radius: 4px; 
+        }
+        button { 
+            background-color: #3498db; 
+            color: white; 
+            border: none; 
+            cursor: pointer; 
+            font-weight: bold; 
+        }
+        button:hover { 
+            background-color: #2980b9; 
+        }
+        .btn-refresh { 
+            background-color: #2ecc71; 
+        }
+        .btn-refresh:hover { 
+            background-color: #27ae60; 
+        }
+        .btn-ban { 
+            background-color: #e74c3c; 
+            padding: 4px 8px; 
+            font-size: 12px; 
+        }
+        .btn-ban:hover { 
+            background-color: #c0392b; 
+        }
+        .btn-normal { 
+            background-color: #95a5a6; 
+            padding: 4px 8px; 
+            font-size: 12px; 
+        }
+        .btn-del { 
+            background-color: #34495e; 
+            padding: 4px 8px; 
+            font-size: 12px; 
+        }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            background: white; 
+            border-radius: 8px; 
+            overflow: hidden; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
+        }
+        th, td { 
+            padding: 10px 12px; 
+            text-align: left; 
+            border-bottom: 1px solid #eee; 
+            font-size: 13px; 
+        }
+        th { 
+            background-color: #2c3e50; 
+            color: white; 
+            font-weight: bold; 
+        }
+        tr:hover { 
+            background-color: #f8f9fa; 
+        }
+        .badge-del { 
+            background-color: #e74c3c; 
+            color: white; 
+            padding: 2px 6px; 
+            border-radius: 3px; 
+            font-size: 11px; 
+        }
+        .badge-ok { 
+            background-color: #2ecc71; 
+            color: white; 
+            padding: 2px 6px; 
+            border-radius: 3px; 
+            font-size: 11px; 
+        }
+        /* 드래그 앤 드롭 스타일 */
+        tr.draggable-row {
+            cursor: grab;
+        }
+        tr.draggable-row:active {
+            cursor: grabbing;
+        }
+        tr.dragging {
+            opacity: 0.4;
+            background-color: #e8f4f8;
+        }
+        tr.drag-over {
+            border-top: 2px solid #3498db;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>🛡️ 메틴1 헬퍼 실시간 인증 관리</h2>
+
+    <!-- 상단 간편 등록 및 충전 패널 -->
+    <div class="control-box">
+        <input type="text" id="addName" placeholder="폴더명 (예: 5700G-1)" style="width: 130px;">
+        <input type="text" id="addSerial" placeholder="고유번호 (PC-NEW-...)" style="width: 250px;">
+        <input type="text" id="addDuration" placeholder="기간(일수 또는 영구)" style="width: 140px;">
+        <button onclick="saveUser()">➕ 등록 / 기간 충전</button>
+        <button class="btn-refresh" onclick="loadUsers()">🔄 새로고침</button>
+    </div>
+
+    <!-- 유저 목록 테이블 -->
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 130px;">이름(사용자명)</th>
+                <th>등록번호 (HWID)</th>
+                <th style="width: 140px; text-align: center;">만료일</th>
+                <th style="width: 110px; text-align: center;">남은기간</th>
+                <th style="width: 70px; text-align: center;">버전</th>
+                <th style="width: 90px; text-align: center;">상태</th>
+                <th style="width: 140px; text-align: center;">관리</th>
+            </tr>
+        </thead>
+        <tbody id="userTableBody">
+            <tr><td colspan="7" style="text-align:center; padding: 20px;">데이터를 불러오는 중...</td></tr>
+        </tbody>
+    </table>
+
+    <script>
+        const DB_URL = "https://metin1-helper-default-rtdb.firebaseio.com/users";
+        let draggedRow = null;
+
+        // 1. 유저 목록 불러오기 (sortOrder 기준 정렬)
+        async function loadUsers() {
+            try {
+                const res = await fetch(`${DB_URL}.json`);
+                const data = await res.json();
+                const tbody = document.getElementById("userTableBody");
+                tbody.innerHTML = "";
+
+                if (!data) {
+                    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding: 20px;">등록된 유저가 없습니다.</td></tr>`;
+                    return;
+                }
+
+                // 배열 변환 후 sortOrder 기준 오름차순 정렬
+                const userList = Object.entries(data).filter(([_, info]) => typeof info === 'object' && info !== null);
+                userList.sort((a, b) => {
+                    const orderA = typeof a[1]["sortOrder"] === 'number' ? a[1]["sortOrder"] : 99999;
+                    const orderB = typeof b[1]["sortOrder"] === 'number' ? b[1]["sortOrder"] : 99999;
+                    return orderA - orderB;
+                });
+
+                for (const [name, info] of userList) {
+                    let serialList = [];
+                    for (const [key, val] of Object.entries(info)) {
+                        if (key.includes("등록") && typeof val === "string") {
+                            serialList.push(val);
+                        }
+                    }
+                    const serialStr = serialList.join("<br>") || "-";
+
+                    const expire = info["만료일"] || "-";
+                    const remain = info["남은기간"] || (info["등록기간"] ? info["등록기간"] + " (대기)" : "-");
+                    const version = info["사용버전"] || "-";
+                    const status = info["상태"] || "";
+
+                    let statusHtml = `<span class="badge-ok">정상</span>`;
+                    if (status.toLowerCase() === "x" || status === "차단") {
+                        statusHtml = `<span class="badge-del">자폭대기</span>`;
+                    } else if (status === "삭제완료") {
+                        statusHtml = `<span class="badge-del" style="background:#8e44ad;">삭제완료</span>`;
+                    } else if (status === "만료") {
+                        statusHtml = `<span class="badge-del" style="background:#e67e22;">기간만료</span>`;
+                    }
+
+                    const tr = document.createElement("tr");
+                    tr.className = "draggable-row";
+                    tr.draggable = true;
+                    tr.dataset.name = name;
+
+                    tr.innerHTML = `
+                        <td><b>${name}</b></td>
+                        <td style="font-family: Consolas; font-size: 15px;">${serialStr}</td>
+                        <td style="text-align: center;">${expire}</td>
+                        <td style="text-align: center;">${remain}</td>
+                        <td style="text-align: center;">${version}</td>
+                        <td style="text-align: center;">${statusHtml}</td>
+                        <td style="text-align: center;">
+                            <button class="btn-ban" onclick="changeStatus('${name}', 'x')">자폭</button>
+                            <button class="btn-normal" onclick="changeStatus('${name}', '')">정상</button>
+                            <button class="btn-del" onclick="deleteUser('${name}')">삭제</button>
+                        </td>
+                    `;
+
+                    addDragEvents(tr);
+                    tbody.appendChild(tr);
+                }
+            } catch (err) {
+                alert("데이터 로드 실패: " + err.message);
+            }
+        }
+
+        // 2. 드래그 앤 드롭 이벤트 등록
+        function addDragEvents(row) {
+            row.addEventListener("dragstart", (e) => {
+                draggedRow = row;
+                row.classList.add("dragging");
+                e.dataTransfer.effectAllowed = "move";
+            });
+
+            row.addEventListener("dragend", () => {
+                row.classList.remove("dragging");
+                document.querySelectorAll(".drag-over").forEach(el => el.classList.remove("drag-over"));
+                saveRowOrder(); // 드래그 종료 시 새로운 순서 저장
+            });
+
+            row.addEventListener("dragover", (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+                const targetRow = e.currentTarget;
+                if (targetRow !== draggedRow) {
+                    targetRow.classList.add("drag-over");
+                }
+            });
+
+            row.addEventListener("dragleave", (e) => {
+                e.currentTarget.classList.remove("drag-over");
+            });
+
+            row.addEventListener("drop", (e) => {
+                e.preventDefault();
+                const targetRow = e.currentTarget;
+                targetRow.classList.remove("drag-over");
+                if (targetRow !== draggedRow) {
+                    const tbody = targetRow.parentNode;
+                    const allRows = Array.from(tbody.querySelectorAll("tr.draggable-row"));
+                    const draggedIdx = allRows.indexOf(draggedRow);
+                    const targetIdx = allRows.indexOf(targetRow);
+
+                    if (draggedIdx < targetIdx) {
+                        tbody.insertBefore(draggedRow, targetRow.nextSibling);
+                    } else {
+                        tbody.insertBefore(draggedRow, targetRow);
+                    }
+                }
+            });
+        }
+
+        // 3. 변경된 순서를 파이어베이스에 일괄 저장
+        async function saveRowOrder() {
+            const tbody = document.getElementById("userTableBody");
+            const rows = tbody.querySelectorAll("tr.draggable-row");
+            const updatePromises = [];
+
+            rows.forEach((row, index) => {
+                const name = row.dataset.name;
+                if (!name) return;
+                const promise = fetch(`${DB_URL}/${encodeURIComponent(name)}.json`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ "sortOrder": index + 1 })
+                });
+                updatePromises.push(promise);
+            });
+
+            try {
+                await Promise.all(updatePromises);
+            } catch (err) {
+                console.error("순서 저장 실패:", err);
+            }
+        }
+
+        // 4. 신규 등록 및 기간 충전
+        async function saveUser() {
+            const name = document.getElementById("addName").value.trim();
+            const serial = document.getElementById("addSerial").value.trim();
+            const duration = document.getElementById("addDuration").value.trim();
+
+            if (!name) {
+                alert("이름(폴더명)을 입력하세요.");
+                return;
+            }
+
+            let payload = {};
+            if (serial) payload["a등록"] = serial;
+            if (duration) payload["등록기간"] = duration;
+            payload["상태"] = "";
+            payload["sortOrder"] = 99999; // 신규 유저는 맨 뒤에 위치
+
+            try {
+                await fetch(`${DB_URL}/${encodeURIComponent(name)}.json`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                alert(`${name} 설정이 저장되었습니다.`);
+                document.getElementById("addName").value = "";
+                document.getElementById("addSerial").value = "";
+                document.getElementById("addDuration").value = "";
+                loadUsers();
+            } catch (err) {
+                alert("저장 실패: " + err.message);
+            }
+        }
+
+        // 5. 상태 변경
+        async function changeStatus(name, newStatus) {
+            try {
+                await fetch(`${DB_URL}/${encodeURIComponent(name)}.json`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ "상태": newStatus })
+                });
+                loadUsers();
+            } catch (err) {
+                alert("상태 변경 실패: " + err.message);
+            }
+        }
+
+        // 6. 유저 영구 삭제
+        async function deleteUser(name) {
+            if (!confirm(`정말 [${name}] 유저를 완전히 삭제하시겠습니까?`)) return;
+            try {
+                await fetch(`${DB_URL}/${encodeURIComponent(name)}.json`, { method: 'DELETE' });
+                loadUsers();
+            } catch (err) {
+                alert("삭제 실패: " + err.message);
+            }
+        }
+
+        loadUsers();
+    </script>
+</body>
+</html>
