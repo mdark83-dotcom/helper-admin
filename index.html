@@ -2,19 +2,25 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
+    <!-- 🎯 모바일 화면 크기에 맞게 자동 비율 조정해주는 핵심 메타태그 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>매크로 인증 관리</title>
     <style>
+        * {
+            box-sizing: border-box;
+        }
         body { 
             font-family: '맑은 고딕', sans-serif; 
             background-color: #f4f6f9; 
-            margin: 30px auto; 
+            margin: 20px auto; 
             max-width: 1150px; 
-            padding: 0 20px; 
+            padding: 0 15px; 
         }
         h2 { 
             color: #2c3e50; 
             margin-bottom: 15px; 
             text-align: center; 
+            font-size: 20px;
         }
         .control-box { 
             background: white; 
@@ -23,13 +29,13 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
             margin-bottom: 20px; 
             display: flex; 
-            gap: 10px; 
+            gap: 8px; 
             align-items: center; 
             justify-content: center; 
             flex-wrap: wrap; 
         }
         input, select, button { 
-            padding: 8px 12px; 
+            padding: 9px 12px; 
             font-size: 13px; 
             border: 1px solid #ccc; 
             border-radius: 4px; 
@@ -52,35 +58,47 @@
         }
         .btn-ban { 
             background-color: #e74c3c; 
-            padding: 4px 8px; 
+            padding: 5px 8px; 
             font-size: 12px; 
+            margin-bottom: 2px;
         }
         .btn-ban:hover { 
             background-color: #c0392b; 
         }
         .btn-normal { 
             background-color: #95a5a6; 
-            padding: 4px 8px; 
+            padding: 5px 8px; 
             font-size: 12px; 
+            margin-bottom: 2px;
         }
         .btn-del { 
             background-color: #34495e; 
-            padding: 4px 8px; 
+            padding: 5px 8px; 
             font-size: 12px; 
+            margin-bottom: 2px;
+        }
+
+        /* 🎯 모바일에서 표가 잘리지 않고 손가락으로 좌우 스크롤 가능하도록 감싸는 박스 */
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            -webkit-overflow-scrolling: touch;
         }
         table { 
             width: 100%; 
+            min-width: 750px; /* 테이블 최소 너비를 확보하여 데이터가 찌그러지지 않음 */
             border-collapse: collapse; 
             background: white; 
-            border-radius: 8px; 
-            overflow: hidden; 
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
         }
         th, td { 
             padding: 10px 12px; 
             text-align: left; 
             border-bottom: 1px solid #eee; 
             font-size: 13px; 
+            white-space: nowrap; /* 텍스트가 줄바꿈되어 깨지는 것 방지 */
         }
         th { 
             background-color: #2c3e50; 
@@ -104,6 +122,7 @@
             border-radius: 3px; 
             font-size: 11px; 
         }
+
         /* 드래그 앤 드롭 스타일 */
         tr.draggable-row {
             cursor: grab;
@@ -118,6 +137,23 @@
         tr.drag-over {
             border-top: 2px solid #3498db;
         }
+
+        /* 📱 스마트폰 화면 전용 스타일 (너비 768px 이하일 때 적용) */
+        @media (max-width: 768px) {
+            body {
+                margin: 15px auto;
+                padding: 0 10px;
+            }
+            .control-box {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .control-box input, 
+            .control-box button {
+                width: 100% !important;
+                font-size: 14px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -126,30 +162,32 @@
 
     <!-- 상단 간편 등록 및 충전 패널 -->
     <div class="control-box">
-        <input type="text" id="addName" placeholder="폴더명 (예: 5700G-1)" style="width: 130px;">
-        <input type="text" id="addSerial" placeholder="고유번호 (PC-NEW-...)" style="width: 250px;">
-        <input type="text" id="addDuration" placeholder="기간(일수 또는 영구)" style="width: 140px;">
+        <input type="text" id="addName" placeholder="폴더명 (예: 5700G-1)">
+        <input type="text" id="addSerial" placeholder="고유번호 (PC-NEW-...)">
+        <input type="text" id="addDuration" placeholder="기간(일수 또는 영구)">
         <button onclick="saveUser()">➕ 등록 / 기간 충전</button>
         <button class="btn-refresh" onclick="loadUsers()">🔄 새로고침</button>
     </div>
 
-    <!-- 유저 목록 테이블 -->
-    <table>
-        <thead>
-            <tr>
-                <th style="width: 130px;">이름(사용자명)</th>
-                <th>등록번호 (HWID)</th>
-                <th style="width: 140px; text-align: center;">만료일</th>
-                <th style="width: 110px; text-align: center;">남은기간</th>
-                <th style="width: 70px; text-align: center;">버전</th>
-                <th style="width: 90px; text-align: center;">상태</th>
-                <th style="width: 140px; text-align: center;">관리</th>
-            </tr>
-        </thead>
-        <tbody id="userTableBody">
-            <tr><td colspan="7" style="text-align:center; padding: 20px;">데이터를 불러오는 중...</td></tr>
-        </tbody>
-    </table>
+    <!-- 유저 목록 테이블 감싸기 -->
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 130px;">이름(사용자명)</th>
+                    <th>등록번호 (HWID)</th>
+                    <th style="width: 140px; text-align: center;">만료일</th>
+                    <th style="width: 110px; text-align: center;">남은기간</th>
+                    <th style="width: 70px; text-align: center;">버전</th>
+                    <th style="width: 90px; text-align: center;">상태</th>
+                    <th style="width: 140px; text-align: center;">관리</th>
+                </tr>
+            </thead>
+            <tbody id="userTableBody">
+                <tr><td colspan="7" style="text-align:center; padding: 20px;">데이터를 불러오는 중...</td></tr>
+            </tbody>
+        </table>
+    </div>
 
     <script>
         const DB_URL = "https://metin1-helper-default-rtdb.firebaseio.com/users";
@@ -206,7 +244,7 @@
 
                     tr.innerHTML = `
                         <td><b>${name}</b></td>
-                        <td style="font-family: Consolas; font-size: 15px;">${serialStr}</td>
+                        <td style="font-family: Consolas; font-size: 13px;">${serialStr}</td>
                         <td style="text-align: center;">${expire}</td>
                         <td style="text-align: center;">${remain}</td>
                         <td style="text-align: center;">${version}</td>
@@ -237,7 +275,7 @@
             row.addEventListener("dragend", () => {
                 row.classList.remove("dragging");
                 document.querySelectorAll(".drag-over").forEach(el => el.classList.remove("drag-over"));
-                saveRowOrder(); // 드래그 종료 시 새로운 순서 저장
+                saveRowOrder();
             });
 
             row.addEventListener("dragover", (e) => {
@@ -311,7 +349,7 @@
             if (serial) payload["a등록"] = serial;
             if (duration) payload["등록기간"] = duration;
             payload["상태"] = "";
-            payload["sortOrder"] = 99999; // 신규 유저는 맨 뒤에 위치
+            payload["sortOrder"] = 99999;
 
             try {
                 await fetch(`${DB_URL}/${encodeURIComponent(name)}.json`, {
